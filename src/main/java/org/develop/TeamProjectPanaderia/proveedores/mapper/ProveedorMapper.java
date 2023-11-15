@@ -35,11 +35,12 @@ public class ProveedorMapper {
 
     public Proveedor toProveedor(ProveedorUpdateDto proveedorUpd, Proveedor proveedor, Categoria categoria){
         return Proveedor.builder()
+                .id(proveedor.getId())
                 .nif(proveedorUpd.getNif() == null ? proveedor.getNif() : proveedorUpd.getNif())
                 .tipo(categoria == null ? proveedor.getTipo() : categoria)
-                .numero(proveedor.getNumero() == null ? proveedorUpd.getNumero() : proveedor.getNumero())
-                .nombre(proveedor.getNombre() == null ? proveedorUpd.getNombre() : proveedor.getNombre())
-                .isActive(proveedor.getIsActive() == null ? proveedorUpd.getIsActive() : proveedor.getIsActive())
+                .numero(proveedorUpd.getNumero() == null ? proveedor.getNumero() : proveedorUpd.getNumero())
+                .nombre(proveedorUpd.getNombre() == null ? proveedor.getNombre() : proveedorUpd.getNombre())
+                .isActive(proveedorUpd.getIsActive() == null ? proveedor.getIsActive() : proveedorUpd.getIsActive())
                 .fechaUpdate(LocalDate.now())
                 .build();
     }

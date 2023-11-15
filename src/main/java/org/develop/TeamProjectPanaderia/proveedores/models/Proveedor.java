@@ -26,13 +26,13 @@ public class Proveedor {
     @Pattern(message = "El NIF debe tener 8 digitos + 1 letra", regexp = "^\\d{8}[A-Za-z]$")
     @NotBlank(message = "El NIF no puede estar vacio")
     private String nif;
-    @OneToOne
+    @ManyToOne
     @JoinColumn(name = "tipo")
     private Categoria tipo;
     @Column(name = "numero", unique = true)
     @Pattern(message = "El numero debe tener 9 caracteres", regexp = "^[0-9]{9}$")
     private String numero;
-    @Column(name = "name", unique = true, nullable = false)
+    @Column(name = "name", nullable = false)
     @NotBlank(message = "El nombre no puede estar vacio")
     @Length(min = 3, message = "El nombre debe tener al menos 8 caracteres")
     private String nombre;
