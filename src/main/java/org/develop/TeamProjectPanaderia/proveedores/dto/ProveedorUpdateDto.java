@@ -11,10 +11,11 @@ import org.hibernate.validator.constraints.Length;
 @NoArgsConstructor
 public class ProveedorUpdateDto {
     @Pattern(message = "El NIF debe tener 8 digitos + 1 letra", regexp = "^\\d{8}[A-Za-z]$")
-    private String nif;
-    private String tipo;
+    String nif;
+    String tipo;
     @Pattern(message = "El numero debe tener 9 caracteres", regexp = "^[0-9]{9}$")
-    private String numero;
+    String numero;
     @Length(min = 3, message = "El nombre debe tener al menos 8 caracteres")
-    private String nombre;
+    String nombre;
+    Boolean isActive;
 }

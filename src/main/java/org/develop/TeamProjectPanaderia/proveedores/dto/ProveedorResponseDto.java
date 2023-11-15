@@ -10,11 +10,12 @@ import java.time.LocalDate;
 @AllArgsConstructor
 @NoArgsConstructor
 public class ProveedorResponseDto {
-    private String nif;
-    private Categoria tipo;
-    private String numero;
-    private String nombre;
-    private LocalDate fechaCreacion;
-    private LocalDate fechaUpdate;
+    String nif;
+    Categoria tipo;
+    String numero;
+    String nombre;
+    Boolean isActive;
+    LocalDate fechaCreacion;
+    LocalDate fechaUpdate;
 
 }

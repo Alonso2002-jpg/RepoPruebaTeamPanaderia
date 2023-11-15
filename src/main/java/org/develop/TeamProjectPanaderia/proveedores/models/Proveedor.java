@@ -2,6 +2,7 @@ package org.develop.TeamProjectPanaderia.proveedores.models;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -35,6 +36,10 @@ public class Proveedor {
     @NotBlank(message = "El nombre no puede estar vacio")
     @Length(min = 3, message = "El nombre debe tener al menos 8 caracteres")
     private String nombre;
+    @NotNull
+    @Builder.Default
+    @Column(name = "isActive", nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean isActive = true;
     @Column(name = "fechaCreacion",updatable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
     @Builder.Default
     private LocalDate fechaCreacion = LocalDate.now();
