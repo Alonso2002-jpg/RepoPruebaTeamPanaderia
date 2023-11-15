@@ -42,15 +42,15 @@ public class CategoriaServiceImpl implements CategoriaService{
     public CategoriaServiceImpl(CategoriaRepository categoriaRepository,
                                 CategoriaMapper categoriaMapper,
                                 WebSocketConfig webSocketConfig,
-                                WebSocketHandler webSocketHandler,
                                 ObjectMapper objMapper,
                                 NotificacionMapper notificacionMapper) {
         this.categoriaRepository = categoriaRepository;
         this.categoriaMapper = categoriaMapper;
         this.webSocketConfig = webSocketConfig;
-        this.webSocketHandler = webSocketHandler;
+        webSocketConfig.setUrlAndEntity("categoria", "Categoria");
+        this.webSocketHandler = webSocketConfig.webSocketHandler();
         this.objMapper = objMapper;
-        this.notificacionMapper = notificacionMapper;
+        this.notificacionMapper = notificacionMapper;;
     }
 
     @Override

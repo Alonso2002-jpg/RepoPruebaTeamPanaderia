@@ -1,16 +1,25 @@
 package org.develop.TeamProjectPanaderia.personal.services;
 
+import jakarta.persistence.criteria.Join;
 import lombok.extern.slf4j.Slf4j;
 import org.develop.TeamProjectPanaderia.categoria.models.Categoria;
 import org.develop.TeamProjectPanaderia.categoria.services.CategoriaService;
 import org.develop.TeamProjectPanaderia.personal.dto.PersonalCreateDto;
 import org.develop.TeamProjectPanaderia.personal.dto.PersonalUpdateDto;
-import org.develop.TeamProjectPanaderia.personal.exceptions.PersonalException;
+import org.develop.TeamProjectPanaderia.personal.exceptions.PersonalBadUuid;
+import org.develop.TeamProjectPanaderia.personal.exceptions.PersonalNotSaved;
 import org.develop.TeamProjectPanaderia.personal.exceptions.PersonalNotFoundException;
 import org.develop.TeamProjectPanaderia.personal.mapper.PersonalMapper;
 import org.develop.TeamProjectPanaderia.personal.models.Personal;
 import org.develop.TeamProjectPanaderia.personal.repositories.PersonalRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,10 +28,12 @@ import java.util.UUID;
 
 @Slf4j
 @Service
+@CacheConfig(cacheNames = "personal")
 public class PersonalServiceImpl implements PersonalService {
     private final PersonalRepository personalRepository;
     private final PersonalMapper personalMapper;
     private final CategoriaService categoriaService;
+
     @Autowired
     public PersonalServiceImpl(PersonalRepository personalRepository, PersonalMapper personalMapper, CategoriaService categoriaService) {
         this.personalRepository = personalRepository;
@@ -30,70 +41,80 @@ public class PersonalServiceImpl implements PersonalService {
         this.categoriaService = categoriaService;
     }
 
-
-
-
     @Override
-    public List<Personal> findAll(Boolean isActive, String seccion) {
-        if ((seccion == null || seccion.isEmpty()) && (isActive== null || isActive )) {
-            log.info("Buscando todos los personales ");
-        return personalRepository.findAll();
-        }
-        if (seccion != null && !seccion.isEmpty() && (isActive==null || isActive)) {
-            log.info("Buscando todos los personales por categoria ");
-            return personalRepository.findAllByCategoriaContainsIgnoreCase(seccion);
-        }
-        if ( (seccion ==null || seccion.isEmpty())){
-            log.info("Buscando todas las secciones por personal");
-            return personalRepository.findByIsActive(isActive);
-        }
-        log.info("Buscando todo todos los perosnales por seccion: "+ seccion+" y si esta activo o no: "+isActive);
-        return  personalRepository.findByCategoriaContainingIgnoreCaseAndIsActive( seccion ,isActive);
+    public Page<Personal> findAll(Optional<String> nombre, Optional<String> dni, Optional<String> seccion, Optional<Boolean> isActivo, Pageable pageable) {
+        Specification<Personal> specNombrePersonal = (root, query, criteriaBuilder) ->
+                nombre.map(n -> criteriaBuilder.like(criteriaBuilder.lower(root.get("nombre")), "%" + n.toLowerCase() + "%"))
+                        .orElseGet(() -> criteriaBuilder.isTrue(criteriaBuilder.literal(true)));
+
+        Specification<Personal> specDniPersonal = (root, query, criteriaBuilder) ->
+                dni.map(n -> criteriaBuilder.like(criteriaBuilder.lower(root.get("dni")), "%" + n.toLowerCase() + "%"))
+                        .orElseGet(() -> criteriaBuilder.isTrue(criteriaBuilder.literal(true)));
+
+        Specification<Personal> specSeccionPersonal = (root, query, criteriaBuilder) ->
+                seccion.map(c ->{
+                    Join<Personal, Categoria> categoriaJoin = root.join("seccion");
+                    return criteriaBuilder.like(criteriaBuilder.lower(categoriaJoin.get("nameCategory")), "%" + c.toLowerCase() + "%");
+                }).orElseGet(() -> criteriaBuilder.isTrue(criteriaBuilder.literal(true)));
+
+        Specification<Personal> specIsActivo = (root, query, criteriaBuilder) ->
+                isActivo.map(a -> criteriaBuilder.equal(root.get("active"), a))
+                        .orElseGet(() -> criteriaBuilder.isTrue(criteriaBuilder.literal(true)));
+
+        Specification<Personal> criterio = Specification.where(specNombrePersonal)
+                .and(specDniPersonal)
+                .and(specSeccionPersonal)
+                .and(specIsActivo);
+        return personalRepository.findAll(criterio, pageable);
     }
 
     @Override
+    @Cacheable
     public Personal findById(String id) {
         log.info("Buscando por id");
         try {
-            UUID uudi = UUID.fromString(id);
-            return personalRepository.findById(uudi).orElseThrow(() -> new PersonalNotFoundException("No se ha encontrado el personal con id: " + uudi) {
+            var uuid = UUID.fromString(id);
+            return personalRepository.findById(uuid).orElseThrow(() -> new PersonalNotFoundException(uuid) {
             });
         } catch (IllegalArgumentException e) {
-            throw new PersonalException("El id: " + id + " no es un UUID válido");
+            throw new PersonalBadUuid(id);
         }
     }
 
     @Override
-    public Personal save(PersonalCreateDto perosnalCreateDto) {
+    @CachePut
+    public Personal save(PersonalCreateDto personalCreateDto) {
       log.info("Guardando Personal");
-      Categoria categoria= categoriaService.findByName(perosnalCreateDto.seccion());
-      UUID id= UUID.randomUUID();
-
-        return personalRepository.save( personalMapper.toPersonal(id, categoria, perosnalCreateDto));
+      if(personalRepository.findByDniEqualsIgnoreCase(personalCreateDto.dni()).isPresent()) {
+          throw new PersonalNotSaved(personalCreateDto.dni());
+      }
+      Categoria categoria = categoriaService.findByName(personalCreateDto.seccion());
+      UUID id = UUID.randomUUID();
+      return personalRepository.save(personalMapper.toPersonalCreate(id, categoria, personalCreateDto));
     }
 
     @Override
+    @CachePut
     public Personal update(String id, PersonalUpdateDto personalDto) {
         log.info("Actualizando");
         var personalUpd = this.findById(id);
         Categoria categoria = null;
-        if (personalDto.section() != null && !personalDto.section().isEmpty()) {
-           categoria= categoriaService.findByName(personalDto.section());
+        if (personalDto.seccion() != null && !personalDto.seccion().isEmpty()) {
+           categoria= categoriaService.findByName(personalDto.seccion());
         } else {
             categoria = personalUpd.getSeccion();
         }
-
-        return personalRepository.save(personalMapper.toPersonalUdate(personalDto, personalUpd, categoria));
-
+        return personalRepository.save(personalMapper.toPersonalUpdate(personalDto, personalUpd, categoria));
     }
 
     @Override
-    public Optional <Personal> findPersonalByDni(String dni) {
-        return personalRepository.findByDni(dni);
+    @Cacheable
+    public Personal findPersonalByDni(String dni) {
+        return personalRepository.findByDniEqualsIgnoreCase(dni).orElseThrow(() -> new PersonalNotFoundException(dni));
     }
 
-
     @Override
+    @CacheEvict
     public void deleteById(String id) {
         log.info("Borrando por id");
         var personal = findById(id);
@@ -104,6 +125,4 @@ public class PersonalServiceImpl implements PersonalService {
     public List<Personal> findByActiveIs(Boolean isActive) {
         return personalRepository.findByIsActive(isActive);
     }
-
-
 }
